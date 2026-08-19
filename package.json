@@ -1,12 +1,15 @@
 {
   "name": "v-shiroya-insu",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "dev": "tsx server-openrouter.ts",
+    "dev": "node --import ./openrouter-reliability.mjs --import tsx/esm server-openrouter.ts",
     "build": "esbuild server-openrouter.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
-    "start": "node dist/server.cjs",
+    "start": "node --import ./openrouter-reliability.mjs dist/server.cjs",
     "clean": "rm -rf dist server.cjs",
     "lint": "tsc --noEmit"
   },
