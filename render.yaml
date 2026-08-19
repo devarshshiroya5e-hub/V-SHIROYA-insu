@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: v-shiroya-insu
+    name: v-shiroya-api
     runtime: node
     plan: free
     buildCommand: npm install && npm run build
@@ -15,5 +15,7 @@ services:
         value: mistral-ocr
       - key: OPENROUTER_MAX_TOKENS
         value: "12000"
+      - key: MAX_BODY_SIZE
+        value: "100mb"
       - key: NODE_ENV
         value: production
