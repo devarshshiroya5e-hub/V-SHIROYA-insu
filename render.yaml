@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: v-shiroya-insu
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: openrouter/free
+      - key: OPENROUTER_PDF_ENGINE
+        value: mistral-ocr
+      - key: OPENROUTER_MAX_TOKENS
+        value: "12000"
+      - key: NODE_ENV
+        value: production
