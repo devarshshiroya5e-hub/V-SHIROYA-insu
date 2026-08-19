@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "node --import ./openrouter-fetch-patch.mjs ./node_modules/tsx/dist/cli.mjs server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
-    "start": "node dist/server.cjs",
+    "start": "node --import ./openrouter-fetch-patch.mjs dist/server.cjs",
     "clean": "rm -rf dist server.cjs",
     "lint": "tsc --noEmit"
   },
