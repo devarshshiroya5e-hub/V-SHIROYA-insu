@@ -11,8 +11,20 @@ const PORT = Number(process.env.PORT || 3000);
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
 
-// Render receives the PDF here as a base64 data URL from the existing frontend.
-// Keep this large enough for normal policy documents while avoiding unbounded bodies.
+// Firebase Hosting redirects /api/* to Render. These CORS headers allow the
+// browser to follow that redirect and call the Render API without frontend changes.
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  res.setHeader("Access-Control-Allow-Origin", origin || "*");
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Max-Age", "86400");
+  if (req.method === "OPTIONS") return res.status(204).end();
+  next();
+});
+
+// Render receives PDFs as base64 data URLs from the existing frontend.
 app.use(express.json({ limit: process.env.MAX_BODY_SIZE || "100mb" }));
 app.use(express.urlencoded({ limit: process.env.MAX_BODY_SIZE || "100mb", extended: true }));
 
@@ -21,7 +33,10 @@ const SECURITY_LOGS_FILE = path.join(process.cwd(), "security_audit.json");
 
 function loadPolicies(): any[] {
   try {
-    if (fs.existsSync(DATA_FILE)) return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+    if (fs.existsSync(DATA_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+      return Array.isArray(parsed) ? parsed : [];
+    }
   } catch (error) {
     console.error("Error reading policies_db.json:", error);
   }
@@ -38,7 +53,10 @@ function savePolicies(policies: any[]) {
 
 function loadAuditLogs(): any[] {
   try {
-    if (fs.existsSync(SECURITY_LOGS_FILE)) return JSON.parse(fs.readFileSync(SECURITY_LOGS_FILE, "utf8"));
+    if (fs.existsSync(SECURITY_LOGS_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(SECURITY_LOGS_FILE, "utf8"));
+      if (Array.isArray(parsed)) return parsed;
+    }
   } catch (error) {
     console.error("Error reading security_audit.json:", error);
   }
@@ -63,7 +81,11 @@ function addAuditLog(action: string, actor: string, details: string, req: expres
     ipAddress: req.ip || "127.0.0.1"
   });
   if (logs.length > 100) logs.length = 100;
-  try { fs.writeFileSync(SECURITY_LOGS_FILE, JSON.stringify(logs, null, 2), "utf8"); } catch (error) { console.error(error); }
+  try {
+    fs.writeFileSync(SECURITY_LOGS_FILE, JSON.stringify(logs, null, 2), "utf8");
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 function safeParseJson(value: string): any | null {
@@ -170,7 +192,7 @@ async function callOpenRouter(fileData: string, fileName: string, mimeType: stri
     response_format: { type: "json_object" },
     temperature: 0.1,
     max_tokens: Number(process.env.OPENROUTER_MAX_TOKENS || 12000),
-    plugins: [{ id: "file-parser", pdf: { engine: process.env.OPENROUTER_PDF_ENGINE || "cloudflare-ai" } }]
+    plugins: [{ id: "file-parser", pdf: { engine: process.env.OPENROUTER_PDF_ENGINE || "mistral-ocr" } }]
   };
 
   const response = await fetch(OPENROUTER_URL, {
@@ -178,7 +200,7 @@ async function callOpenRouter(fileData: string, fileName: string, mimeType: stri
     headers: {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": process.env.APP_URL || "https://v-shiroya-insu.onrender.com",
+      "HTTP-Referer": process.env.APP_URL || "https://v-shiroya-api.onrender.com",
       "X-Title": "V-SHIROYA Insurance Policy Analyzer"
     },
     body: JSON.stringify(body)
@@ -191,9 +213,7 @@ async function callOpenRouter(fileData: string, fileName: string, mimeType: stri
   }
 
   const content = data?.choices?.[0]?.message?.content;
-  if (Array.isArray(content)) {
-    return safeParseJson(content.map((x: any) => x?.text || "").join("\n"));
-  }
+  if (Array.isArray(content)) return safeParseJson(content.map((x: any) => x?.text || "").join("\n"));
   return safeParseJson(typeof content === "string" ? content : "");
 }
 
@@ -218,7 +238,10 @@ async function performAiPolicyAnalysis(fileData: string, fileName: string, mimeT
   return result;
 }
 
-// ---- API ----
+app.get("/", (_req, res) => {
+  res.status(200).json({ ok: true, service: "V Shiroya AI Backend", provider: "OpenRouter", health: "/api/health" });
+});
+
 app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
@@ -226,20 +249,13 @@ app.get("/api/health", (_req, res) => {
     aiProvider: "OpenRouter",
     openrouterConfigured: Boolean(process.env.OPENROUTER_API_KEY),
     model: OPENROUTER_MODEL,
-    pdfEngine: process.env.OPENROUTER_PDF_ENGINE || "cloudflare-ai",
+    pdfEngine: process.env.OPENROUTER_PDF_ENGINE || "mistral-ocr",
     timestamp: new Date().toISOString()
   });
 });
 
 app.get("/api/auth/me", (_req, res) => {
-  res.json({ user: {
-    id: "acc-1",
-    name: "VIJAY SHIROYA",
-    email: "vijay.ca@policyai.com",
-    firmName: "VIJAY SHIROYA & Co. Chartered Accountants",
-    role: "Senior Accountant / Auditor",
-    avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
-  }});
+  res.json({ user: { id: "acc-1", name: "VIJAY SHIROYA", email: "vijay.ca@policyai.com", firmName: "VIJAY SHIROYA & Co. Chartered Accountants", role: "Senior Accountant / Auditor", avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80" } });
 });
 
 app.post("/api/analyze-policy", async (req, res) => {
@@ -283,7 +299,7 @@ app.post("/api/policies", (req, res) => {
   try {
     const policyData = req.body || {};
     const policies = loadPolicies();
-    const newPolicy = { ...policyData, id: policyData.id || `pol-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), userId: "acc-1" };
+    const newPolicy = { ...policyData, id: policyData.id || `pol-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), userId: "acc-1" };
     policies.unshift(newPolicy);
     savePolicies(policies);
     addAuditLog("POLICY_CREATED", "VIJAY SHIROYA (CA)", `Saved policy #${newPolicy.policyNumber} for ${newPolicy.ownerName}`, req);
@@ -354,14 +370,8 @@ app.post("/api/notifications/send-alert", (req, res) => {
 app.get("/api/notifications/history", (_req, res) => res.json({ success: true, count: notificationHistoryLogs.length, logs: notificationHistoryLogs }));
 
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (_req, res) => res.sendFile(path.join(distPath, "index.html")));
-  }
+  // The Render service is API-only. Do not mount Vite or serve a missing frontend
+  // build here; Firebase Hosting owns the frontend deployment.
   app.listen(PORT, "0.0.0.0", () => console.log(`V Shiroya OpenRouter server listening on ${PORT}`));
 }
 
