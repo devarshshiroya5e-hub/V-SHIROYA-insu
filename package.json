@@ -1,14 +1,14 @@
 {
   "name": "v-shiroya-insu",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "dev": "node --import ./openrouter-reliability.mjs --import tsx/esm server-openrouter.ts",
-    "build": "esbuild server-openrouter.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "esbuild server-openrouter.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && node -e \"require('fs').mkdirSync('dist',{recursive:true}); require('fs').writeFileSync('dist/index.html','<!doctype html><html><head><meta charset=\\\"UTF-8\\\"><title>V Shiroya API</title></head><body><h1>V Shiroya API</h1><p>API service is running.</p></body></html>')\"",
     "start": "node --import ./openrouter-reliability.mjs dist/server.cjs",
     "clean": "rm -rf dist server.cjs",
     "lint": "tsc --noEmit"
@@ -34,7 +34,6 @@
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",
-    "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.3"
   }
