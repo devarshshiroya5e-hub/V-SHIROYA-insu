@@ -1,20 +1,29 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# V-SHIROYA-insu
 
-# Run and deploy your AI Studio app
+AI-powered insurance policy management and analysis portal.
 
-This contains everything you need to run your app locally.
+## AI policy analyzer
 
-View your app in AI Studio: https://ai.studio/apps/d4756037-1df0-4ee5-8c0e-1fdb89643975
+The existing frontend contract is preserved. Uploaded PDF policies are sent to the Render backend, then analyzed through OpenRouter. The server accepts PDF data as base64 and sends it to OpenRouter's PDF/file processing pipeline.
 
-## Run Locally
+Required Render environment variable:
 
-**Prerequisites:**  Node.js
+```text
+OPENROUTER_API_KEY=your_openrouter_key
+```
 
+Default model:
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```text
+OPENROUTER_MODEL=openrouter/free
+```
+
+The backend also uses a reliability layer for bulk uploads: requests are serialized, transient 429/5xx responses are retried, request timeouts are bounded, and same-millisecond legacy policy IDs are made unique.
+
+## Render
+
+The repository contains `render.yaml` for the `v-shiroya-api` Node web service. The service builds with `npm install && npm run build`, starts with `npm start`, and exposes `/api/health` for the Render health check.
+
+## Frontend/API routing
+
+Firebase Hosting routes `/api/**` to the Render service `v-shiroya-api`; all other frontend routes continue to use the existing SPA rewrite.
