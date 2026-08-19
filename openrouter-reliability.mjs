@@ -1,12 +1,24 @@
 // Reliability layer for bulk policy analysis.
 // Keeps OpenRouter requests below the free-tier request rate, serializes bursts,
-// and retries transient 429/5xx failures without changing the frontend contract.
+// retries transient 429/5xx failures, and prevents same-millisecond policy IDs.
 const originalFetch = globalThis.fetch;
 const MIN_INTERVAL_MS = Number(process.env.OPENROUTER_MIN_INTERVAL_MS || 3200);
 const MAX_RETRIES = Number(process.env.OPENROUTER_MAX_RETRIES || 2);
 const TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 180000);
 let queue = Promise.resolve();
 let lastStart = 0;
+
+// The legacy backend creates IDs with `pol-${Date.now()}`. During bulk uploads,
+// multiple requests can arrive in the same millisecond. Keep Date.now monotonic
+// so those generated IDs remain unique without changing the frontend contract.
+const realDateNow = Date.now.bind(Date);
+let lastDateNow = 0;
+Date.now = () => {
+  const current = realDateNow();
+  if (current <= lastDateNow) lastDateNow += 1;
+  else lastDateNow = current;
+  return lastDateNow;
+};
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
