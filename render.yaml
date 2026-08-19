@@ -3,6 +3,7 @@ services:
     name: v-shiroya-api
     runtime: node
     plan: free
+    autoDeploy: true
     buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
@@ -15,6 +16,12 @@ services:
         value: mistral-ocr
       - key: OPENROUTER_MAX_TOKENS
         value: "12000"
+      - key: OPENROUTER_MIN_INTERVAL_MS
+        value: "3200"
+      - key: OPENROUTER_MAX_RETRIES
+        value: "2"
+      - key: OPENROUTER_TIMEOUT_MS
+        value: "180000"
       - key: MAX_BODY_SIZE
         value: "100mb"
       - key: NODE_ENV
