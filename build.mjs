@@ -1,11 +1,31 @@
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 
-const hasFrontend = fs.existsSync("src/main.tsx") || fs.existsSync("src/main.jsx") || fs.existsSync("src/main.ts") || fs.existsSync("src/main.js");
+// Use the local esbuild binary directly instead of spawning npx.cmd on Windows.
+// This avoids Windows spawnSync EINVAL errors caused by npx.cmd invocation.
+const runLocalBinary = (name, args) => {
+  const bin = process.platform === "win32"
+    ? `node_modules/.bin/${name}.cmd`
+    : `node_modules/.bin/${name}`;
+
+  if (!fs.existsSync(bin)) {
+    throw new Error(
+      `Required local binary not found: ${bin}. Run \"npm install\" before building.`
+    );
+  }
+
+  execFileSync(bin, args, { stdio: "inherit", shell: false });
+};
+
+const hasFrontend =
+  fs.existsSync("src/main.tsx") ||
+  fs.existsSync("src/main.jsx") ||
+  fs.existsSync("src/main.ts") ||
+  fs.existsSync("src/main.js");
 
 if (hasFrontend) {
   console.log("Frontend source detected; building Vite application...");
-  execFileSync(process.platform === "win32" ? "npx.cmd" : "npx", ["vite", "build"], { stdio: "inherit" });
+  runLocalBinary("vite", ["build"]);
 } else {
   console.log("No frontend source in this deployment; building API-only Render service.");
   fs.mkdirSync("dist", { recursive: true });
@@ -15,8 +35,7 @@ if (hasFrontend) {
   );
 }
 
-execFileSync(process.platform === "win32" ? "npx.cmd" : "npx", [
-  "esbuild",
+runLocalBinary("esbuild", [
   "server-openrouter.ts",
   "--bundle",
   "--platform=node",
@@ -24,4 +43,4 @@ execFileSync(process.platform === "win32" ? "npx.cmd" : "npx", [
   "--packages=external",
   "--sourcemap",
   "--outfile=dist/server.cjs"
-], { stdio: "inherit" });
+]);
